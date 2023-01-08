@@ -1,6 +1,7 @@
+use std::fs;
 use std::io::prelude::*;
-use std::net::TcpStream;
 use std::net::TcpListener;
+use std::net::TcpStream;
 fn main() {
     // 监听 TCP 连接
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
@@ -12,19 +13,35 @@ fn main() {
 
         // println!("Connection established!");
         handle_connection(stream);
-
     }
 }
 
 // 从 TCP 流内读取数据
 fn handle_connection(mut stream: TcpStream) {
     // 在栈上声明一个用于存放数据的 buffer，512 字节的缓冲区
-    let mut buffer  = [0;512];
+    let mut buffer = [0; 512];
     // 使用缓冲区调用 stream.read，它会从 TcpStream 中读取数据并将其存储至缓冲区中
     stream.read(&mut buffer).unwrap();
 
     // String::from_utf8_lossy 可以接收一个 &[u8] 并产生对应的 String
-    println!("Request: {}", String::from_utf8_lossy(&buffer[..]));
+    // println!("Request: {}", String::from_utf8_lossy(&buffer[..]));
+
+    let get = b"GET / HTTP/1.1\r\n";
+
+    let (status_line, filename) = if buffer.starts_with(get) {
+        ("HTTP/1.1 200 OK\r\n\r\n", "hello.html")
+    } else {
+        ("HTTP/1.1 404 NOT FOUND\r\n\r\n", "404.html")
+    };
+        
+    let contents = fs::read_to_string(filename).unwrap();
+    let response = format!("{}{}", status_line, contents);
+    // 由于 stream 的 write 方法只接收 &[u8] 类型值作为参数，所以需要调用 as_byte 方法来将它的字符串转换为字节
+    stream.write(response.as_bytes()).unwrap();
+    stream.flush().unwrap();
+
+    println!("{:?}", response);
+   
 }
 
 // 访问 http://127.0.0.1:7878/
